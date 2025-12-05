@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:17
+    ports:
+      - "54328:5432"
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=notifications
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+  redis:
+    image: redis:latest
+    container_name: redis-local
+    ports:
+      - "6379:6379"
+    restart: always
+  web:
+    build: .
+    command: sh -c "python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8001 "
+    volumes:
+      - .:/code
+    ports:
+      - "8001:8001"
+    environment:
+      - POSTGRES_NAME=notifications
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+  celery:
+    build: .
+    command: celery -A config.celery worker --loglevel=info
+    depends_on:
+      - redis
+      - db
+      - web
+    restart: always
